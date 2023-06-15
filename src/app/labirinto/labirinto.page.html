@@ -1,0 +1,31 @@
+<ion-content>
+  <ion-item>
+    <ion-label>Quantidade de Colunas</ion-label>
+    <ion-input type="number" [(ngModel)]="numColunas"></ion-input>
+  </ion-item>
+  <ion-item>
+    <ion-label>Quantidade de Linhas</ion-label>
+    <ion-input type="number" [(ngModel)]="numLinhas"></ion-input>
+  </ion-item>
+
+  <ion-button expand="full" (click)="criarLabirinto()">Criar Labirinto</ion-button>
+
+  <div class="labirinto-container">
+    <div class="usuario-info">
+      <p>Vida: {{ vidas }}</p>
+      <p>Pontos: {{ pontos }}</p>
+      <p>Passos: {{ passos }}</p>
+    </div>
+    <div *ngFor="let linha of labirinto; let i = index" class="linha">
+      <div *ngFor="let celula of linha; let j = index" [ngClass]="{'celula': true, 'parede': celula === 1, 'saida': i === saidaRow && j === saidaCol}" [attr.id]="'celula-' + i + '-' + j" (click)="moveAvatar(i, j)">
+        <ion-icon *ngIf="celula === 0 && i === avatarRow && j === avatarCol" name="person" class="avatar"></ion-icon>
+        <ion-icon *ngIf="celula === 2" name="logo-apple" class="maca"></ion-icon>
+        <ion-icon *ngIf="i === saidaRow && j === saidaCol" name="pin" class="saida"></ion-icon>
+      </div>
+    </div>
+  </div>
+
+  <ion-button (click)="calcularMenorCaminho()">Calcular Menor Caminho</ion-button>
+  <ion-button (click)="calcularMenorCaminhoComMacas()">Calcular Menor Caminho com Maçãs</ion-button>
+  <ion-button (click)="reiniciar()">Reiniciar Labirinto</ion-button>
+</ion-content>

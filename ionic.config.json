@@ -1,0 +1,7 @@
+{
+  "name": "labirintoufpa",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
