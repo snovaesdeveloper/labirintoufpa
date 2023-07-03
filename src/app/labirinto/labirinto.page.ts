@@ -97,27 +97,45 @@ A função percorre todas as células do labirinto que estão livres (valor 0)
  A posição da saída é escolhida como a célula que possui a maior distância em relação ao avatar.
   */
 
-  adicionarSaida() {
-    const avatarPos = {
-      row: this.avatarRow,
-      col: this.avatarCol
-    };
+ adicionarSaida() {
+  const avatarPos = {
+    row: this.avatarRow,
+    col: this.avatarCol
+  };
 
-    const distances = this.calcularDistancias(avatarPos);
+  const distances = this.calcularDistancias(avatarPos);
 
-    let maxDistance = -1;
-    for (let row = 0; row < this.labirinto.length; row++) {
-      for (let col = 0; col < this.labirinto[row].length; col++) {
-        if (this.labirinto[row][col] === 0 && distances[row][col] > maxDistance) {
-          maxDistance = distances[row][col];
-          this.saidaRow = row;
-          this.saidaCol = col;
+  let maxDistance = -1;
+  let candidateCells = [];
+
+  // Itera sobre todas as células do labirinto
+  for (let row = 0; row < this.labirinto.length; row++) {
+    for (let col = 0; col < this.labirinto[row].length; col++) {
+      // Verifica se a célula é um caminho vazio (0)
+      if (this.labirinto[row][col] === 0) {
+        // Verifica se a célula está na borda do labirinto
+        if (row === 0 || row === this.labirinto.length - 1 || col === 0 || col === this.labirinto[row].length - 1) {
+          // Adiciona a célula à lista de candidatas
+          candidateCells.push({ row, col });
         }
       }
     }
-
-    this.labirinto[this.saidaRow][this.saidaCol] = 3; // Saida
   }
+
+  // Encontra a célula com a maior distância entre as candidatas
+  for (let cell of candidateCells) {
+    const distance = distances[cell.row][cell.col];
+    if (distance > maxDistance) {
+      maxDistance = distance;
+      this.saidaRow = cell.row;
+      this.saidaCol = cell.col;
+    }
+  }
+
+  // Define a célula da saída no labirinto
+  this.labirinto[this.saidaRow][this.saidaCol] = 3; // Saida
+}
+
 
   posicionarAvatar() {
     let row, col;
