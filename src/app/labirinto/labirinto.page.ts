@@ -1,9 +1,12 @@
 import { Component, OnInit } from '@angular/core';
+import { PriorityQueue } from 'typescript-collections';
+
 
 interface QueueItem {
   row: number;
   col: number;
   distance: number;
+  path: { row: number; col: number }[];
 }
 
 
@@ -14,7 +17,6 @@ interface QueueItem {
 })
 export class LabirintoPage implements OnInit {
 
-
   labirinto: number[][];
   avatarRow: number;
   avatarCol: number;
@@ -23,18 +25,20 @@ export class LabirintoPage implements OnInit {
   numColunas: number;
   saidaRow: number;
   saidaCol: number;
-  pontos:number =0;
-  passos:number =0;
+  pontos: number = 0;
+  passos: number = 0;
+  menorCaminho: { row: number; col: number }[] = [];
+
 
 
 
   constructor() {
-this.labirinto=[];
-this.avatarRow=0;
-this.avatarCol=0;
-this.saidaRow=0;
-this.saidaCol=0;
-this.vidas=3;
+    this.labirinto = [];
+    this.avatarRow = 0;
+    this.avatarCol = 0;
+    this.saidaRow = 0;
+    this.saidaCol = 0;
+    this.vidas = 3;
     this.numLinhas = 10; // Valor padrão para o número de linhas
     this.numColunas = 10; // Valor padrão para o número de colunas
   }
@@ -52,23 +56,28 @@ this.vidas=3;
     }
 
     this.inicializarLabirinto(this.numLinhas, this.numColunas);
+    this.encontrarMenorCaminho();
   }
-
 
   inicializarLabirinto(i: number, j: number) {
     this.labirinto = [];
     this.vidas = 3; // Quantidade de vidas
+    this.menorCaminho = []; // Limpa o menor caminho
 
     for (let row = 0; row < i; row++) {
       this.labirinto[row] = [];
       for (let col = 0; col < j; col++) {
-        this.labirinto[row][col] = Math.random() < 0.1 ? 1 : 0; // 30% de chance de uma célula ser parede (1)
+        if (row === 0 || col === 0 || row === i - 1 || col === j - 1) {
+          this.labirinto[row][col] = 0; // Paredes nas laterais
+        } else {
+          this.labirinto[row][col] = Math.random() < 0.6 ? 1 : 0; // 30% de chance de uma célula ser parede (1)
+        }
       }
     }
 
     this.adicionarMacas(5); // Quantidade de maçãs
     this.posicionarAvatar(); // Posicionar o avatar no labirinto
-    this.adicionarSaida(); // Add a saidao mais longe possivel do usuario
+    this.adicionarSaida(); // Adicionar a saída mais longe possível do usuário
   }
 
   adicionarMacas(macas: number) {
@@ -82,7 +91,6 @@ this.vidas=3;
       }
     }
   }
-
   /*
 A função percorre todas as células do labirinto que estão livres (valor 0)
  e calcula a distância entre cada uma delas e a posição do avatar.
@@ -95,99 +103,112 @@ A função percorre todas as células do labirinto que estão livres (valor 0)
       col: this.avatarCol
     };
 
-    let maxDistance = -1;
-    let farthestRow = -1;
-    let farthestCol = -1;
+    const distances = this.calcularDistancias(avatarPos);
 
+    let maxDistance = -1;
     for (let row = 0; row < this.labirinto.length; row++) {
       for (let col = 0; col < this.labirinto[row].length; col++) {
-        if (this.labirinto[row][col] === 0) {
-          const distance = Math.abs(row - avatarPos.row) + Math.abs(col - avatarPos.col);
-          if (distance > maxDistance) {
-            maxDistance = distance;
-            farthestRow = row;
-            farthestCol = col;
-          }
+        if (this.labirinto[row][col] === 0 && distances[row][col] > maxDistance) {
+          maxDistance = distances[row][col];
+          this.saidaRow = row;
+          this.saidaCol = col;
         }
       }
     }
 
-    this.labirinto[farthestRow][farthestCol] = 4; // Saída
-    this.saidaRow = farthestRow;
-    this.saidaCol = farthestCol;
+    this.labirinto[this.saidaRow][this.saidaCol] = 3; // Saida
   }
-
-
 
   posicionarAvatar() {
-    if (!this.labirinto || this.labirinto.length === 0 || this.labirinto[0].length === 0) {
-      return;
-    }
-
-    // Remover avatares existentes
-    const avataresAntigos = document.getElementsByClassName('avatar');
-    while (avataresAntigos.length > 0) {
-      avataresAntigos[0].parentNode?.removeChild(avataresAntigos[0]);
-    }
-
-    // Encontrar a primeira célula vazia para posicionar o avatar
-    for (let i = 0; i < this.labirinto.length; i++) {
-      for (let j = 0; j < this.labirinto[i].length; j++) {
-        if (this.labirinto[i][j] === 0) {
-          this.avatarRow = i;
-          this.avatarCol = j;
-
-          // Criar e posicionar o novo avatar
-          const avatar = document.createElement('ion-icon');
-          avatar.setAttribute('name', 'person');
-          avatar.setAttribute('class', 'avatar');
-          const celulaAvatar = document.getElementById(`celula-${i}-${j}`);
-          if (celulaAvatar) {
-            celulaAvatar.appendChild(avatar);
-          }
-          return;
-        }
-      }
-    }
-  }
-
-
-  moveAvatar(row: number, col: number) {
-  if (!this.labirinto || this.vidas <= 0) {
-    return;
-  }
-
-  if (this.labirinto[row][col] === 1) {
-    // Tentativa de entrar em uma célula de parede
-    return;
-  }
-
-  const rowDiff = Math.abs(row - this.avatarRow);
-  const colDiff = Math.abs(col - this.avatarCol);
-
-  if ((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1)) {
-    if (row === this.avatarRow && col === this.avatarCol) {
-      // O avatar atingiu uma parede
-      this.vidas--;
-      if (this.vidas === 0) {
-        // O usuário perdeu todas as vidas
-        alert('Você perdeu todas as vidas! Fim de jogo.');
-      } else {
-        alert('Você perdeu uma vida! Vidas restantes: ' + this.vidas);
-      }
-    } else if (this.labirinto[row][col] === 2) {
-      // O avatar pegou uma maçã
-      this.labirinto[row][col] = 0;
-      alert('Você pegou uma maçã!');
-      this.pontos++; // Aumenta a pontuação por pegar uma maçã
-    }
+    let row, col;
+    do {
+      row = Math.floor(Math.random() * this.numLinhas);
+      col = Math.floor(Math.random() * this.numColunas);
+    } while (this.labirinto[row][col] !== 0);
 
     this.avatarRow = row;
     this.avatarCol = col;
-
-    this.passos++; // Conta cada passo dado pelo avatar
+    this.labirinto[this.avatarRow][this.avatarCol] = 0; // Avatar
   }
-}
+
+
+  calcularDistancias(startPos: { row: number; col: number }) {
+    const distances = new Array(this.labirinto.length);
+    for (let row = 0; row < this.labirinto.length; row++) {
+      distances[row] = new Array(this.labirinto[row].length).fill(Infinity);
+    }
+
+    distances[startPos.row][startPos.col] = 0;
+
+    const queue: QueueItem[] = [{ row: startPos.row, col: startPos.col, distance: 0, path: [] }];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+
+      if (!current) {
+        continue;
+      }
+      const { row, col, distance, path } = current;
+
+
+      if (visited.has(`${row},${col}`)) {
+        continue;
+      }
+
+      visited.add(`${row},${col}`);
+      distances[row][col] = distance;
+
+      const neighbors = this.getNeighbors(row, col);
+      for (const neighbor of neighbors) {
+        const { newRow, newCol } = neighbor;
+        const newPath = [...path, { row: newRow, col: newCol }];
+        queue.push({ row: newRow, col: newCol, distance: distance + 1, path: newPath });
+      }
+    }
+
+    return distances;
+  }
+
+
+
+
+  moveAvatar(row: number, col: number) {
+    if (!this.labirinto || this.vidas <= 0) {
+      return;
+    }
+
+    if (this.labirinto[row][col] === 1) {
+      // Tentativa de entrar em uma célula de parede
+      return;
+    }
+
+    const rowDiff = Math.abs(row - this.avatarRow);
+    const colDiff = Math.abs(col - this.avatarCol);
+
+    if ((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1)) {
+      if (row === this.avatarRow && col === this.avatarCol) {
+        // O avatar atingiu uma parede
+        this.vidas--;
+        if (this.vidas === 0) {
+          // O usuário perdeu todas as vidas
+          alert('Você perdeu todas as vidas! Fim de jogo.');
+        } else {
+          alert('Você perdeu uma vida! Vidas restantes: ' + this.vidas);
+        }
+      } else if (this.labirinto[row][col] === 2) {
+        // O avatar pegou uma maçã
+        this.labirinto[row][col] = 0;
+        alert('Você pegou uma maçã!');
+        this.pontos++; // Aumenta a pontuação por pegar uma maçã
+      }
+
+      this.avatarRow = row;
+      this.avatarCol = col;
+
+      this.passos++; // Conta cada passo dado pelo avatar
+    }
+  }
 
 
 
@@ -198,6 +219,8 @@ A função percorre todas as células do labirinto que estão livres (valor 0)
 
     this.inicializarLabirinto(this.labirinto.length, this.labirinto[0].length);
   }
+
+
 
   calcularMenorCaminho() {
     if (!this.labirinto || this.vidas <= 0) {
@@ -213,8 +236,15 @@ A função percorre todas as células do labirinto que estão livres (valor 0)
     }
 
     const queue: QueueItem[] = [];
-    queue.push({ row: this.avatarRow, col: this.avatarCol, distance: 0 });
+    queue.push({
+      row: this.avatarRow,
+      col: this.avatarCol,
+      distance: 0,
+      path: [{ row: this.avatarRow, col: this.avatarCol }]
+    });
     visited[this.avatarRow][this.avatarCol] = true;
+
+    const shortestPath: { row: number; col: number }[] = [];
 
     while (queue.length > 0) {
       const currentItem = queue.shift();
@@ -223,116 +253,204 @@ A função percorre todas as células do labirinto que estão livres (valor 0)
         continue;
       }
 
-      const { row, col, distance } = currentItem;
+      const { row, col, distance, path } = currentItem;
 
-      if (row === this.labirinto.length - 1 || col === this.labirinto[0].length - 1 || row === 0 || col === 0) {
-        // O caminho mais curto para a saída foi encontrado
-        alert('Caminho mais curto até a saída: ' + distance + ' passos.');
-        return;
+      if (row === this.saidaRow && col === this.saidaCol) {
+        // O caminho até a saída foi encontrado
+        if (!shortestPath.length || distance < shortestPath.length) {
+          shortestPath.splice(0);
+          shortestPath.push(...path);
+        }
       }
 
       const neighbors = this.getNeighbors(row, col);
       for (const neighbor of neighbors) {
-        const newRow = neighbor.row;
-        const newCol = neighbor.col;
+        const newRow = neighbor.newRow;
+
+        const newCol = neighbor.newCol;
         if (this.labirinto[newRow][newCol] === 0 && !visited[newRow][newCol]) {
-          queue.push({ row: newRow, col: newCol, distance: distance + 1 });
+          queue.push({
+            row: newRow,
+            col: newCol,
+            distance: distance + 1,
+            path: [...path, { row: newRow, col: newCol }]
+          });
           visited[newRow][newCol] = true;
         }
       }
     }
 
-    // Não há caminho para a saída
-    alert('Não há caminho para a saída!');
+    if (shortestPath.length) {
+      this.menorCaminho = shortestPath;
+      this.pintarCaminho(shortestPath);
+      alert('Caminho mais curto encontrado! Passos necessários: ' + shortestPath.length);
+    } else {
+      alert('Não há caminho para a saída!');
+    }
   }
 
-
-
-
-  calcularMenorCaminhoComMacas() {
-    if (!this.labirinto || this.vidas <= 0) {
-      return;
-    }
-
-    const visited: boolean[][] = [];
-    for (let i = 0; i < this.labirinto.length; i++) {
-      visited[i] = [];
-      for (let j = 0; j < this.labirinto[0].length; j++) {
-        visited[i][j] = false;
+  pintarCaminho(path: { row: number; col: number }[]) {
+    for (const { row, col } of path) {
+      const cellId = `celula-${row}-${col}`;
+      const cellElement = document.getElementById(cellId);
+      if (cellElement) {
+        cellElement.classList.add('caminho');
       }
     }
+  }
 
-    const queue: QueueItem[] = [];
-    queue.push({ row: this.avatarRow, col: this.avatarCol, distance: 0 });
-    visited[this.avatarRow][this.avatarCol] = true;
+  encontrarMenorCaminho() {
+    const distances = this.calcularDistancias({ row: this.avatarRow, col: this.avatarCol });
 
-    while (queue.length > 0) {
-      const currentItem = queue.shift();
+    const start = { row: this.avatarRow, col: this.avatarCol, distance: 0, path: [] };
+    const goal = { row: this.saidaRow, col: this.saidaCol };
 
-      if (!currentItem) {
-        continue;
+    const bruteForcePath = this.bruteForceSearch(start, goal);
+    const depthFirstPath = this.depthFirstSearch(start, goal);
+    const dijkstraPath = this.dijkstraSearch(start, goal, distances);
+
+    const paths = [bruteForcePath, depthFirstPath, dijkstraPath];
+
+    let minLength = Infinity;
+    let shortestPath: { row: number; col: number }[] = [];
+
+    for (const path of paths) {
+      if (path.length < minLength) {
+        minLength = path.length;
+        shortestPath = path;
       }
+    }
 
-      const { row, col, distance } = currentItem;
+    this.menorCaminho = shortestPath;
+  }
 
-      if (this.labirinto[row][col] === 2) {
-        this.pintarCaminhoComMacas(row, col, distance);
-        return;
-      }
+  bruteForceSearch(start: QueueItem, goal: { row: number; col: number }) {
+    const stack: QueueItem[] = [start];
+    const visited = new Set<string>();
+    let distance = 0;
 
-      const neighbors = this.getNeighbors(row, col);
-      for (const neighbor of neighbors) {
-        const newRow = neighbor.row;
-        const newCol = neighbor.col;
-        if (!this.labirinto[newRow] || !this.labirinto[newRow][newCol]) {
+    while (stack.length > 0) {
+      const current = stack.pop();
+
+      if (current) {
+        const { row, col, path } = current;
+
+
+
+        if (visited.has(`${row},${col}`)) {
           continue;
         }
-        if (this.labirinto[newRow][newCol] === 0 && !visited[newRow][newCol]) {
-          queue.push({ row: newRow, col: newCol, distance: distance + 1 });
-          visited[newRow][newCol] = true;
+
+        visited.add(`${row},${col}`);
+
+        if (row === goal.row && col === goal.col) {
+          return path;
+        }
+
+        const neighbors = this.getNeighbors(row, col);
+        for (const neighbor of neighbors) {
+          const { newRow, newCol } = neighbor;
+          const newPath = [...path, { row: newRow, col: newCol }];
+          stack.push({ row: newRow, col: newCol, distance: distance + 1, path: newPath });
+
+
+
         }
       }
+
     }
 
-    // Não há caminho para a maçã
-    alert('Não há caminho para a maçã (considerando as maçãs)!');
+    return [];
   }
 
-  pintarCaminhoComMacas(row: number, col: number, distance: number) {
-    while (distance > 0) {
-      this.labirinto[row][col] = 3; // Pintar o caminho de verde (valor 3)
+  depthFirstSearch(start: QueueItem, goal: { row: number; col: number }) {
+    const stack: QueueItem[] = [start];
+    const visited = new Set<string>();
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      const { row, col, path } = current!;
+
+
+      if (visited.has(`${row},${col}`)) {
+        continue;
+      }
+
+      visited.add(`${row},${col}`);
+
+      if (row === goal.row && col === goal.col) {
+        return path;
+      }
 
       const neighbors = this.getNeighbors(row, col);
       for (const neighbor of neighbors) {
-        const newRow = neighbor.row;
-        const newCol = neighbor.col;
-        if (this.labirinto[newRow][newCol] === distance - 1) {
-          row = newRow;
-          col = newCol;
-          distance--;
-          break;
-        }
+        const { newRow, newCol } = neighbor;
+        const newPath = [...path, { row: newRow, col: newCol }];
+        stack.push({ row: newRow, col: newCol, distance: 0, path: newPath });
+
       }
     }
 
-    // Mensagem de sucesso
-    alert('Caminho mais curto até a maçã (considerando as maçãs): ' + this.labirinto[row][col] + ' passos.');
+    return [];
   }
 
-  getNeighbors(row: number, col: number): { row: number; col: number }[] {
-    const neighbors: { row: number; col: number }[] = [];
+  dijkstraSearch(start: QueueItem, goal: { row: number; col: number }, distances: number[][]) {
+    const queue = new PriorityQueue<QueueItem>((a, b) => a.distance - b.distance);
+    queue.enqueue(start);
 
-    if (row > 0) {
-      neighbors.push({ row: row - 1, col });
+    const visited = new Set<string>();
+
+    while (!queue.isEmpty()) {
+      const current = queue.dequeue();
+      if (!current) {
+        continue;
+      }
+
+      const { row, col, distance, path } = current;
+
+      if (visited.has(`${row},${col}`)) {
+        continue;
+      }
+
+      visited.add(`${row},${col}`);
+
+      if (row === goal.row && col === goal.col) {
+        return path;
+      }
+
+      const neighbors = this.getNeighbors(row, col);
+      for (const neighbor of neighbors) {
+        const { newRow, newCol } = neighbor;
+        const newPath = [...path, { row: newRow, col: newCol }];
+        const newDistance = distance + 1 + distances[newRow][newCol];
+        queue.enqueue({ row: newRow, col: newCol, distance: newDistance, path: newPath });
+      }
     }
-    if (row < this.labirinto.length - 1) {
-      neighbors.push({ row: row + 1, col });
-    }
-    if (col > 0) {
-      neighbors.push({ row, col: col - 1 });
-    }
-    if (col < this.labirinto[0].length - 1) {
-      neighbors.push({ row, col: col + 1 });
+
+    return [];
+  }
+
+  getNeighbors(row: number, col: number) {
+    const neighbors = [];
+    const directions = [
+      { row: -1, col: 0 }, // Up
+      { row: 1, col: 0 }, // Down
+      { row: 0, col: -1 }, // Left
+      { row: 0, col: 1 }, // Right
+    ];
+
+    for (const direction of directions) {
+      const newRow = row + direction.row;
+      const newCol = col + direction.col;
+      if (
+        newRow >= 0 &&
+        newRow < this.labirinto.length &&
+        newCol >= 0 &&
+        newCol < this.labirinto[0].length &&
+        this.labirinto[newRow][newCol] !== 1
+      ) {
+        neighbors.push({ newRow, newCol });
+      }
     }
 
     return neighbors;
